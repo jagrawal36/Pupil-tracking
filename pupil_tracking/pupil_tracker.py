@@ -1,9 +1,23 @@
 import numpy as np
 import cv2
 import pandas as pd
+from IPython import embed
 
 
 class PupilTracker:
+    def __init__(self, setup=1):
+        if setup == 1:
+            self.th1 = 0.5
+            self.th2 = 0.5
+            self.p1 = 99
+            self.p2 = 1
+        elif setup == 2:
+            self.th1 = 0.75
+            self.th2 = 0.25
+            self.p1 = 97
+            self.p2 = 3
+
+
     def ransac(self, ntrials, contour, small_gray, draw):
         # RANSAC implementation starts
         r2centerx = []
@@ -37,9 +51,58 @@ class PupilTracker:
         return r2centerx, r2centery, r2majrad, r2minrad, r2angle, small_gray
         # RANSAC implementation ends
 
-    def track_without_svm(self, videofile, eye_roi, ransac_trials = 100):
 
-        # x_roi, y_roi, full_patch_size=350, ransac_trials=100):
+
+    def get_pupil_from_contours(self, contours1, small_gray, full_patch_size, draw_image=0, setup=1):
+        # maxc = None
+        maxj = None
+        maxr = -500
+        # draw = 1
+        for j in range(len(contours1)):
+            cnt1 = contours1[j]
+            (x, y), radius1 = cv2.minEnclosingCircle(cnt1)
+            center1 = (int(x), int(y))
+            radius1 = int(radius1)
+            if draw_image:
+                pass
+                # cv2.drawContours(small_gray, contours1, j, (255, 0, 0), 1)
+            if setup == 1:
+                if ((maxr < radius1 - 0.05 * (center1[0] - full_patch_size / 2) - 0.05 * (
+                            center1[1] - full_patch_size / 2)) and (center1[1] > 0.20 * full_patch_size) and (
+                            center1[1] < 0.80 * full_patch_size) and (center1[0] > 0.20 * full_patch_size) and (
+                            center1[0] < 0.80 * full_patch_size) and (radius1 > 5) and (radius1 < 180) and len(
+                        contours1[j]) >= 5):
+                    maxr = radius1 - 0.05 * (center1[0] - full_patch_size / 2) - 0.05 * (
+                        center1[1] - full_patch_size / 2)
+                    maxc = center1
+                    maxj = j
+
+
+            elif setup == 2:
+                # embed()
+                print("For j =",j,"...............................................................")
+                print("maxr = ",maxr)
+                print("compared with = ", radius1 - 0.05 * (pow(pow((center1[0] - full_patch_size / 2), 2) + pow((center1[1] - full_patch_size / 2), 2), 1)))
+                print("Radius = ", radius1)
+                print("Centre = ", center1)
+                if (maxr < radius1 - 0.05 * (pow(pow((center1[0] - full_patch_size / 2), 2) +
+                                                     pow((center1[1] - full_patch_size / 2), 2), 1)) and (
+                            center1[1] > 0.20 * full_patch_size) and (
+                            center1[1] < 0.80 * full_patch_size) and (center1[0] > 0.20 * full_patch_size) and (
+                            center1[0] < 0.80 * full_patch_size) and (radius1 > 5) and (radius1 < 180) and len(
+                        contours1[j]) >= 5):
+                    maxr = radius1 - 0.05 * (pow(pow((center1[0] - full_patch_size / 2), 2) +
+                                                 pow((center1[1] - full_patch_size / 2), 2), 1))
+                    maxc = center1
+                    maxj = j
+        return maxj
+
+    def track_without_svm(self, videofile, eye_roi, ransac_trials=100, setup=1):
+
+        th1 = self.th1
+        th2 = self.th2
+        p1 = self.p1
+        p2 = self.p2
 
         draw_image = 0
         print("Starting for video", videofile)
@@ -50,7 +113,7 @@ class PupilTracker:
         leng = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         # use tt to indicate AFTER how many image do you want to locally save the image
-        tt = 9999999
+        tt = 99999
         fr_count = 0
         while cap.isOpened():
             ret, frame = cap.read()
@@ -64,42 +127,33 @@ class PupilTracker:
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             eye_pos = [eye_roi[1], eye_roi[0]]
-            full_patch_size = max(eye_roi[2]-eye_roi[0], eye_roi[3]-eye_roi[1])
+            full_patch_size = max(eye_roi[2] - eye_roi[0], eye_roi[3] - eye_roi[1])
             small_gray = gray[eye_roi[1]:eye_roi[3], eye_roi[0]:eye_roi[2]]
             cv2.medianBlur(small_gray, 7, small_gray)
             variation = np.std(small_gray)
-            th = 0.5 * (np.percentile(small_gray.ravel(), 99)) + 0.5 * (np.percentile(small_gray.ravel(), 1))
+            th = th1 * (np.percentile(small_gray.ravel(), p1)) + th2 * (np.percentile(small_gray.ravel(), p2))
             _, thres = cv2.threshold(small_gray, th, 255, cv2.THRESH_BINARY)
             _, contours1, hierarchy1 = cv2.findContours(thres, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            maxc = None
-            maxr = 0
-            draw = 0
-            for j in range(len(contours1)):
-                cnt1 = contours1[j]
-                (x, y), radius1 = cv2.minEnclosingCircle(cnt1)
-                center1 = (int(x), int(y))
-                radius1 = int(radius1)
-                if ((maxr < radius1 - 0.05 * (center1[0] - full_patch_size / 2) - 0.05 * (
-                            center1[1] - full_patch_size / 2)) and (center1[1] > 0.20 * full_patch_size) and (
-                            center1[1] < 0.80 * full_patch_size) and (center1[0] > 0.20 * full_patch_size) and (
-                            center1[0] < 0.80 * full_patch_size) and (radius1 > 5) and (radius1 < 180) and len(
-                    contours1[j]) >= 5):
-                    maxr = radius1 - 0.05 * (center1[0] - full_patch_size / 2) - 0.05 * (
-                        center1[1] - full_patch_size / 2)
-                    maxc = center1
-                    maxj = j
 
-            if draw:
+            # embed()
+            maxj = self.get_pupil_from_contours(contours1, small_gray, full_patch_size, draw_image=draw_image,
+                                                setup=setup)
+
+            if draw_image:
                 cv2.rectangle(gray, tuple([int(float(x)) for x in eye_pos[::-1]]),
                               tuple([int(float(x)) + full_patch_size for x in eye_pos[::-1]]), (255, 0, 0), 3)
-            if maxc is not None:
-                draw = 1 * draw_image
+            if maxj is not None:
+                draw = 0 * draw_image
                 r2centerx, r2centery, r2majrad, r2minrad, r2angle, small_gray = self.ransac(ransac_trials,
                                                                                             contours1[maxj],
                                                                                             small_gray, draw)
-                cv2.drawContours(small_gray, contours1, maxj, (255, 0, 0), 1)
+                if draw_image:
+                    cv2.drawContours(small_gray, contours1, maxj, (255, 0, 0), 1)
+
                 ellipse = cv2.fitEllipse(contours1[maxj])
-                cv2.ellipse(small_gray, ellipse, (0, 0, 255), 2)
+
+                if draw_image:
+                    cv2.ellipse(small_gray, ellipse, (0, 0, 255), 2)
 
                 trace.loc[len(trace) + 1] = (
                     float(ellipse[0][0] + eye_pos[1] + 1), float(ellipse[0][1] + eye_pos[0] + 1),
@@ -119,6 +173,6 @@ class PupilTracker:
                 break
 
         cap.release()
-        trace.to_csv('trace.csv', index=False)
+        # trace.to_csv('trace.csv', index=False)
         cv2.destroyAllWindows()
         return trace
