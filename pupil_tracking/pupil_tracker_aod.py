@@ -92,10 +92,10 @@ class PupilTracker:
 
     def track_without_svm(self, videofile, eye_roi, ransac_trials=100):
 
-        th1 = self._params['weight_thres_high']
-        th2 = self._params['weight_thres_low']
-        p1 = self._params['thres_per_high']
-        p2 = self._params['thres_per_low']
+        th1 = self._params['convex_weight_high']
+        th2 = self._params['convex_weight_low']
+        p1 = self._params['thres_perc_high']
+        p2 = self._params['thres_perc_low']
 
         draw_image = 0
         print("Starting for video", videofile)
