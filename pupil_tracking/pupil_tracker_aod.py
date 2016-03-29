@@ -83,9 +83,11 @@ class PupilTracker:
                         center1[1] < rl * full_patch_size) and (center1[0] > ll * full_patch_size) and (
                         center1[0] < rl * full_patch_size) and (radius1 > mir) and (radius1 < mar) and len(
                 contours1[j]) >= 5):
-                maxr = radius1 - 0.05 * (center1[0] - full_patch_size / 2) - 0.05 * (
-                    center1[1] - full_patch_size / 2)
-                maxc = center1
+                maxr = radius1 - p * (pow(pow((center1[0] - full_patch_size / 2), 2) +
+                                              pow((center1[1] - full_patch_size / 2), 2), po))
+                # maxr = radius1 - 0.05 * (center1[0] - full_patch_size / 2) - 0.05 * (
+                #     center1[1] - full_patch_size / 2)
+                # maxc = center1
                 maxj = j
 
         return maxj
